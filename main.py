@@ -5,20 +5,6 @@ img = cv2.imread('AS-OCT\im3.jpeg', 0)
 # plt.title('Original Image')
 # plt.show()
 
-def readCol(umbral, img):
-    print(type(img[0][0]))
-    rows, cols = img.shape
-    listMax = np.zeros((cols,rows), dtype=np.uint8)
-    print(type(listMax[0][0]))
-
-    for i in range(cols):
-        for j in range(rows):
-            listMax[i][j] = int(img[j][i])
-
-    plt.imshow(listMax, cmap='gray')
-    plt.title('Original Image')
-    plt.show()
-
 def a (thigh, img):
     rows, cols = img.shape
 
@@ -48,12 +34,25 @@ def a (thigh, img):
                 pixelsVisitados.append((r, c))
                 outImage[r, c] = 1
 
-    plt.imshow(outImage, cmap='gray')
-    plt.title('Original Image')
-    plt.show()
+    # plt.imshow(outImage, cmap='gray')
+    # plt.title('Original Image')
+    # plt.show()
+    return outImage
 
 
-a(150, img)
+a = a(120, img)
+kernel = np.ones((4,2))
+print(kernel)
+opening = cv2.morphologyEx(a, cv2.MORPH_OPEN, kernel, iterations=1)
+
+
+plt.subplot(121),plt.imshow(a,cmap = 'gray')
+plt.title('Original Image'), plt.xticks([]), plt.yticks([])
+
+plt.subplot(122),plt.imshow(opening,cmap = 'gray')
+plt.title('Opening Image'), plt.xticks([]), plt.yticks([])
+
+plt.show()
 
 # kernel = np.ones((1,10))
 # median = cv2.medianBlur(img,9)
