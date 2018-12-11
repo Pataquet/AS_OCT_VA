@@ -1,138 +1,290 @@
 import cv2
 import numpy as np
-from matplotlib import pyplot as plt
-img = cv2.imread('AS-OCT\im3.jpeg', 0)
-# plt.title('Original Image')
-# plt.show()
-
-def a (thigh, img):
-    rows, cols = img.shape
-
-    M = cv2.getRotationMatrix2D((cols / 2, rows / 2), 90, 1)
-    dst = cv2.warpAffine(img, M, (cols, rows))
-
-    mayorThigh = (dst > thigh)
-
-    outImage = np.zeros(dst.shape)
-    filas, columnas = dst.shape
+import scipy.stats
 
 
-    # u.mostrarImagenes(mayorThigh, mayorTlow)
-    pixelsVisitados = []
-    for r in range(1, filas - 1):
-        for c in range(1, columnas - 1):
-            #ignora todos los valores inferiores a tlow
-            if mayorThigh[r, c] != 1:
-                continue  # Not a weak pixel
+import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
 
-            # Get 3x3 patch
-            localPatch = mayorThigh[r - 1:r + 2, c - 1:c + 2]
-            patchMax = localPatch.max()
-            #si uno de los vecinos del px tiene valor 2 se añade a la matriz para comprobar mas adelante
-            # si tienes mas vecinos superiores a tlow
-            if patchMax == 1:
-                pixelsVisitados.append((r, c))
-                outImage[r, c] = 1
+from skimage import data
+from skimage.filters import threshold_otsu
+from skimage.segmentation import clear_border
+from skimage.measure import label, regionprops
+from skimage.morphology import closing, square
+from skimage.color import label2rgb
 
-    # plt.imshow(outImage, cmap='gray')
-    # plt.title('Original Image')
-    # plt.show()
+
+def readImage (thigh, img):
+    imgOr = cv2.imread(img, 0)
+
+    imgTh = cv2.imread(img, 0)
+    imgTh = cv2.GaussianBlur(imgTh, (11, 11), 0)
+    #imgTh = cv2.adaptiveThreshold(blur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
+    # imgTh =  cv2.getGaussianKernel()
+    # grad_y = cv2.Sobel(imgTh, ddepth, 0, 1, ksize=3, scale=scale, delta=delta, borderType=cv2.BORDER_DEFAULT)
+    # grad_x = cv2.Sobel(imgTh, ddepth, 1, 0, ksize=3, scale=scale, delta=delta, borderType=cv2.BORDER_DEFAULT)
+    #
+    # imgTh = cv2.convertScaleAbs(grad_y)
+    # abs_grad_x = cv2.convertScaleAbs(grad_x)
+    # abs_grad_y = cv2.convertScaleAbs(grad_y)
+    # imgTh = cv2.addWeighted(abs_grad_x, 0.5, abs_grad_y, 0.5, 0)
+
+    imgTh[imgTh < thigh] = 0
+    imgTh[imgTh >= thigh] = 1
+
+    kernel = np.ones((1,10))
+    imgDl = cv2.dilate(imgTh, kernel, iterations = 1)
+
+    return imgOr, imgTh, imgDl
+
+def newImage(image, regionCoords):
+    for i in regionCoords:
+        image[i[0]][i[1]] = 1
+    return image
+
+def cConexas(image, p = False):
+
+    label_image = label(image)
+    image_label_overlay = label2rgb(image, image=image)
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    imageComponentesConexas = np.zeros(image.shape)
+
+    ax.imshow(image_label_overlay)
+    i = 0
+    regions = []
+    for region in regionprops(label_image):
+        # take regions with large enough areas
+        if region.area >= 1000:
+            regions.append(region)
+
+    # To sort the list in place...
+    regions.sort(key=lambda x: x.area, reverse=True)
+
+    # To return a new list, use the sorted() built-in function...
+    regions = sorted(regions, key=lambda x: x.area, reverse=True)
+
+    regions= regions[0:3]
+    for region in regions:
+        # draw rectangle around segmented coins
+        minr, minc, maxr, maxc = region.bbox
+        if (i == 0):
+            rect = mpatches.Rectangle((minc, minr), maxc - minc, maxr - minr, fill=False, edgecolor='red', linewidth=2)
+        elif (i == 1):
+            rect = mpatches.Rectangle((minc, minr), maxc - minc, maxr - minr, fill=False, edgecolor='green',
+                                      linewidth=2)
+        elif (i == 2):
+            rect = mpatches.Rectangle((minc, minr), maxc - minc, maxr - minr, fill=False, edgecolor='blue',
+                                      linewidth=2)
+        elif (i == 3):
+            rect = mpatches.Rectangle((minc, minr), maxc - minc, maxr - minr, fill=False, edgecolor='yellow',
+                                      linewidth=2)
+        else:
+            rect = mpatches.Rectangle((minc, minr), maxc - minc, maxr - minr, fill=False, edgecolor='purple',
+                                      linewidth=2)
+        i = i + 1
+
+        ax.add_patch(rect)
+
+        imageComponentesConexas = newImage(imageComponentesConexas, region.coords)
+
+
+    ax.set_axis_off()
+    plt.tight_layout()
+    plt.imshow(imageComponentesConexas, cmap='gray')
+
+    return imageComponentesConexas, regions
+
+
+def showImage(ori, th,  dl, cc):
+    plt.figure()
+    plt.subplot(221), plt.imshow(ori, cmap='gray')
+    plt.title('OR Image'), plt.xticks([]), plt.yticks([])
+
+    plt.subplot(222), plt.imshow(th, cmap='gray')
+    plt.title('th Image'), plt.xticks([]), plt.yticks([])
+
+    plt.subplot(223), plt.imshow(dl, cmap='gray')
+    plt.title('DL Image'), plt.xticks([]), plt.yticks([])
+
+    plt.subplot(224), plt.imshow(cc, cmap='gray')
+    plt.title('CC Image'), plt.xticks([]), plt.yticks([])
+    plt.show()
+
+def combine(original, regions):
+    filas, columnas = original.shape
+
+    # outImage = np.zeros((filas,columnas))
+    outImage = original.copy()
+    for i in range(filas):
+        for j in range(columnas):
+            if (regions[i][j] == 1 ):
+                outImage[i][j] = original[i][j]
+            else:
+                outImage[i][j] =0
+
+    # kernel = np.ones((3,4))
+    # print(kernel)
+    # outImage =  cv2.morphologyEx(outImage, cv2.MORPH_CLOSE, kernel)
+    # outImage = cv2.Canny(outImage, 120, 180)
+
+
     return outImage
 
+def countPx(img):
+    filas, columnas = img.shape
+    out = img.copy()
+    totalPX = 0
+    valueComunas = np.zeros((1,columnas))
+    for i in range(columnas):
+        countR1 = 0
 
-a = a(120, img)
-kernel = np.ones((4,2))
-print(kernel)
-opening = cv2.morphologyEx(a, cv2.MORPH_OPEN, kernel, iterations=1)
+        blanco = True
+        for j in range(filas):
+            if(img[j][i] == 0):blanco = False
+            if(blanco):continue
+
+            if(img[j][i] == 255):
+                break
+            totalPX = totalPX+1
+            countR1=countR1+1
+            out[j][i] = 255
+        valueComunas[0][i]= countR1
+
+    plt.figure()
+    plt.imshow(out, cmap='gray')
+    plt.title('Parts'), plt.xticks([]), plt.yticks([])
+
+    print("Nº total de px: ",totalPX)
+    print("Media PX: ", totalPX/columnas)
+    return out, valueComunas
+
+def reduceBorders(img):
+    filas, columnas = img.shape
+    out = np.zeros((filas, columnas))
+
+    plt.figure()
+    plt.imshow(img, cmap='gray')
+    plt.title('IMG'), plt.xticks([]), plt.yticks([])
+
+    for i in range(columnas):
+        blanco = True
+        for j in range(filas):
+            if(img[j][i] == 0): blanco = False
+            if(blanco): continue
+            if((not blanco) and img[j][i] == 255):
+                out[j][i] = 255
+                blanco= True
+    plt.figure()
+    plt.imshow(out, cmap='gray')
+    plt.title('Reduc'), plt.xticks([]), plt.yticks([])
+
+    return out
+
+def mediaTruncada(dist):
+    print("MAX: ",max(max(dist)))
+    print("MIN: ", min(min(dist)))
+    # calculamos los percentile 25% y 75% y hallamos la media recortada
+    liminf = scipy.stats.scoreatpercentile(dist, 25)
+    limsup = scipy.stats.scoreatpercentile(dist, 75)
+    print("El 25% percentil es =", liminf, "y el 75% percentil es =", limsup)
+    trimean = scipy.stats.mstats.tmean(dist, (90, 130))
+    print("La media recortada es =", trimean)
 
 
-plt.subplot(121),plt.imshow(a,cmap = 'gray')
-plt.title('Original Image'), plt.xticks([]), plt.yticks([])
+def execute(th):
+    imgOr, imgTh, imgDl  = readImage(th, 'AS-OCT\im12.jpeg')
+    imgCc, regiones = cConexas(imgDl)
+    imgCombine = combine(imgOr, imgCc)
 
-plt.subplot(122),plt.imshow(opening,cmap = 'gray')
-plt.title('Opening Image'), plt.xticks([]), plt.yticks([])
-
-plt.show()
-
-# kernel = np.ones((1,10))
-# median = cv2.medianBlur(img,9)
-#
-# dilate = cv2.dilate(median,kernel,iterations = 1)
-# edges = cv2.Canny(dilate,100,200)
-
-# plt.subplot(221),plt.imshow(img,cmap = 'gray')
-# plt.title('Original Image'), plt.xticks([]), plt.yticks([])
-#
-# plt.subplot(222),plt.imshow(median,cmap = 'gray')
-# plt.title('Median Image'), plt.xticks([]), plt.yticks([])
-#
-# plt.subplot(223),plt.imshow(edges,cmap = 'gray')
-# plt.title('Edges Image'), plt.xticks([]), plt.yticks([])
-#
-# plt.subplot(224),plt.imshow(dilate,cmap = 'gray')
-# plt.title('Dilate Image'), plt.xticks([]), plt.yticks([])
-#
-#
-# plt.show()
+    # plt.figure()
+    # plt.imshow(imgCombine, cmap='gray')
+    # plt.title('Combine 1'), plt.xticks([]), plt.yticks([])
 
 
-# def find_if_close(cnt1,cnt2):
-#     row1,row2 = cnt1.shape[0],cnt2.shape[0]
-#     for i in range(row1):
-#         for j in range(row2):
-#             dist = np.linalg.norm(cnt1[i]-cnt2[j])
-#             if abs(dist) < 50 :
-#                 return True
-#             elif i==row1-1 and j==row2-1:
-#                 return False
-#
-# img = cv2.imread('AS-OCT\im3.jpeg')
-# gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
-# ret,thresh = cv2.threshold(gray,127,255,0)
-# _, contours, hier = cv2.findContours(thresh,cv2.RETR_EXTERNAL,2)
-#
-#
-#
-# cv2.drawContours(img,contours,-1,(0,255,0),2)
-# cv2.drawContours(edges,contours,-1,255,-1)
-#
-# plt.subplot(121),plt.imshow(img,cmap = 'gray')
-# plt.title('Dilate Image'), plt.xticks([]), plt.yticks([])
-# plt.subplot(122),plt.imshow(edges,cmap = 'gray')
-# plt.title('Dilate Image'), plt.xticks([]), plt.yticks([])
-#
-# LENGTH = len(contours)
-# status = np.zeros((LENGTH,1))
-#
-# for i,cnt1 in enumerate(contours):
-#     x = i
-#     if i != LENGTH-1:
-#         for j,cnt2 in enumerate(contours[i+1:]):
-#             x = x+1
-#             dist = find_if_close(cnt1,cnt2)
-#             if dist == True:
-#                 val = min(status[i],status[x])
-#                 status[x] = status[i] = val
-#             else:
-#                 if status[x]==status[i]:
-#                     status[x] = i+1
-#
-# unified = []
-# maximum = int(status.max())+1
-# for i in range(maximum):
-#     pos = np.where(status==i)[0]
-#     if pos.size != 0:
-#         cont = np.vstack(contours[i] for i in pos)
-#         hull = cv2.convexHull(cont)
-#         unified.append(hull)
-#
-# cv2.drawContours(img,unified,-1,(0,255,0),2)
-# cv2.drawContours(thresh,unified,-1,255,-1)
-#
-# plt.subplot(122),plt.imshow(img,cmap = 'gray')
-# plt.title('Dilate Image'), plt.xticks([]), plt.yticks([])
+    imgCombine[imgCombine > 150] = 255
+    imgCombine[imgCombine <= 150] = 0
+    imgReduc = reduceBorders(imgCombine)
 
-# plt.show()
-#
-#
+    imgFin, _ = countPx(imgReduc)
+    imgFin, capa1 = countPx(imgFin)
+    imgFin, capa2 = countPx(imgFin)
+    mediaTruncada(capa1)
+    mediaTruncada(capa2)
+    # imagem = cv2.bitwise_not(imgCombine)
+    # imgFin = cConexas(imagem, True)
 
+
+    # plt.figure()
+    # plt.plot(imgOr[:, 0])
+
+    # imgFin = countPx(imgCombine)
+    # imgFin = countPx(imgFin)
+    # imgFin = countPx(imgFin)
+    # imgFin = countPx(imgFin)
+
+    # edges = cv2.Canny(imgCombine, 0, 50)
+    # kernel = np.ones((2, 1))
+
+    # erode = cv2.morphologyEx(edges, cv2.MORPH_DILATE, kernel)
+    # tmp = countPx(edges)
+
+
+
+
+    # plt.figure()
+    # plt.imshow(imgCombine, cmap='gray')
+    # plt.title('comb2'), plt.xticks([]), plt.yticks([])
+    plt.show()
+
+
+
+    # showImage(imgOr, imgTh, imgDl, imgCc)
+
+    # imgOr, imgTh = readImage(th, 'AS-OCT\im2.jpeg')
+    # imgCc = cConexas(imgTh)
+    # showImage(imgOr, imgTh, imgCc)
+    #
+    # imgOr, imgTh = readImage(th, 'AS-OCT\im3.jpeg')
+    # imgCc = cConexas(imgTh)
+    # showImage(imgOr, imgTh, imgCc)
+    #
+    # imgOr, imgTh = readImage(th, 'AS-OCT\im4.jpeg')
+    # imgCc = cConexas(imgTh)
+    # showImage(imgOr, imgTh, imgCc)
+    #
+    # imgOr, imgTh = readImage(th, 'AS-OCT\im5.jpeg')
+    # imgCc = cConexas(imgTh)
+    # showImage(imgOr, imgTh, imgCc)
+    #
+    # imgOr, imgTh = readImage(th, 'AS-OCT\im6.jpeg')
+    # imgCc = cConexas(imgTh)
+    # showImage(imgOr, imgTh, imgCc)
+    #
+    # imgOr, imgTh = readImage(th, 'AS-OCT\im7.jpeg')
+    # imgCc = cConexas(imgTh)
+    # showImage(imgOr, imgTh, imgCc)
+    #
+    # imgOr, imgTh = readImage(th, 'AS-OCT\im8.jpeg')
+    # imgCc = cConexas(imgTh)
+    # showImage(imgOr, imgTh, imgCc)
+    #
+    # imgOr, imgTh = readImage(th, 'AS-OCT\im9.jpeg')
+    # imgCc = cConexas(imgTh)
+    # showImage(imgOr, imgTh, imgCc)
+    #
+    # imgOr, imgTh = readImage(th, 'AS-OCT\im10.jpeg')
+    # imgCc = cConexas(imgTh)
+    # showImage(imgOr, imgTh, imgCc)
+    #
+    # imgOr, imgTh = readImage(th, 'AS-OCT\im11.jpeg')
+    # imgCc = cConexas(imgTh)
+    # showImage(imgOr, imgTh, imgCc)
+    #
+    # imgOr, imgTh = readImage(th, 'AS-OCT\im12.jpeg')
+    # imgCc = cConexas(imgTh)
+    # showImage(imgOr, imgTh, imgCc)
+
+
+execute(90)

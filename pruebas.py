@@ -13,10 +13,6 @@ from skimage.color import label2rgb
 
 
 def readImage (thigh, img):
-    scale = 1
-    delta = 0
-    ddepth = cv2.CV_16S
-
     imgOr = cv2.imread(img, 0)
 
     imgTh = cv2.imread(img, 0)
@@ -34,7 +30,7 @@ def readImage (thigh, img):
     imgTh[imgTh < thigh] = 0
     imgTh[imgTh >= thigh] = 1
 
-    kernel = np.ones((1,10))
+    kernel = np.ones((1,14))
 
     imgDl = cv2.dilate(imgTh, kernel, iterations = 1)
 
@@ -68,9 +64,9 @@ def cConexas(image):
             print(maxc)
             print(maxr)
 
-            if(minc<50):
-                ax.add_patch(rect)
-                imageComponentesConexas = newImage(imageComponentesConexas, region.coords)
+            # if(minc<50):
+            ax.add_patch(rect)
+            imageComponentesConexas = newImage(imageComponentesConexas, region.coords)
 
 
     ax.set_axis_off()
@@ -97,7 +93,7 @@ def showImage(ori, th, cc, dl):
 
 
 def execute(th):
-    imgOr, imgTh, imgDl  = readImage(th, 'AS-OCT\im4.jpeg')
+    imgOr, imgTh, imgDl  = readImage(th, 'AS-OCT\im3.jpeg')
     imgCc = cConexas(imgDl)
     showImage(imgOr, imgTh, imgCc, imgDl)
 
