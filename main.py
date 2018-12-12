@@ -2,9 +2,9 @@ import cv2
 import numpy as np
 import scipy.stats
 
-
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
+from scipy import ndimage
 
 from skimage import data
 from skimage.filters import threshold_otsu
@@ -18,6 +18,8 @@ def readImage (thigh, img):
     imgOr = cv2.imread(img, 0)
 
     imgTh = cv2.imread(img, 0)
+    imgTh = ndimage.grey_opening(imgTh, size=(3, 3))
+
     imgTh = cv2.GaussianBlur(imgTh, (11, 11), 0)
     #imgTh = cv2.adaptiveThreshold(blur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
     # imgTh =  cv2.getGaussianKernel()
@@ -32,8 +34,12 @@ def readImage (thigh, img):
     imgTh[imgTh < thigh] = 0
     imgTh[imgTh >= thigh] = 1
 
-    kernel = np.ones((2,10))
+    # kernel = np.ones((1, 5))
+    # imgDl = cv2.erode(imgTh, kernel, iterations=1)
+
+    kernel = np.ones((2,15))
     imgDl = cv2.dilate(imgTh, kernel, iterations = 1)
+
 
 
     return imgOr, imgTh, imgDl
@@ -49,7 +55,6 @@ def cConexas(image):
 
     imageComponentesConexas = np.zeros(image.shape)
 
-    i = 0
     regions = []
     for region in regionprops(label_image):
         # take regions with large enough areas
@@ -62,15 +67,24 @@ def cConexas(image):
     # To return a new list, use the sorted() built-in function...
     regions = sorted(regions, key=lambda x: x.area, reverse=True)
 
-    regions= regions[0:5]
+    # regions= regions[0:5]
     for region in regions:
-        # draw rectangle around segmented coins
-
         imageComponentesConexas = newImage(imageComponentesConexas, region.coords)
+
     return imageComponentesConexas, regions
 
+def unionCC(regions):
 
-def cConexas2(image):
+    for region in regions:
+        minr1, minc1, maxr1, maxc1 = region.bbox
+        for region in regions:
+            minr2, minc2, maxr2, maxc2 = region.bbox
+            if(minc1==minc2 and minr1 == minr2 and maxc1== maxc2 and maxr1== maxr2 ): continue
+
+        
+
+
+def cConexas2(image, nombre):
 
     label_image = label(image)
     image_label_overlay = label2rgb(image, image=image)
@@ -101,8 +115,8 @@ def cConexas2(image):
         else:
             rect = mpatches.Rectangle((minc, minr), maxc - minc, maxr - minr, fill=False, edgecolor='purple',
                                       linewidth=2)
-        i = i + 1
 
+        i = i + 1
         ax.add_patch(rect)
 
         imageComponentesConexas = newImage(imageComponentesConexas, region.coords)
@@ -111,7 +125,7 @@ def cConexas2(image):
     ax.set_axis_off()
     plt.tight_layout()
     plt.imshow(imageComponentesConexas, cmap='gray')
-    plt.title('CC2')
+    plt.title(nombre)
     return imageComponentesConexas, regions
 
 def showImage(ori, th,  dl, cc):
@@ -229,23 +243,60 @@ def reduceMiddleBorder(img, regions):
             img[f][c] = 255
     return img
 
+def a(img):
+
+    ret, thresh = cv2.threshold(img, 50, 255, cv2.THRESH_BINARY)
+    # Finding contours for the thresholded image
+    im2, contours, hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+
+    # create hull array for convex hull points
+    hull = []
+
+    # calculate points for each contour
+    for i in range(len(contours)):
+        # creating convex hull object for each contour
+        hull.append(cv2.convexHull(contours[i], False))
+    # create an empty black image
+    drawing = np.zeros((thresh.shape[0], thresh.shape[1], 3), np.uint8)
+
+    # draw contours and hull points
+    for i in range(len(contours)):
+        color_contours = (0, 255, 0)  # green - color for contours
+        color = (255, 0, 0)  # blue - color for convex hull
+        # draw ith contour
+        cv2.drawContours(drawing, contours, i, color_contours, 1, 8, hierarchy)
+        # draw ith convex hull object
+        cv2.drawContours(drawing, hull, i, color, 1, 8)
+
+    plt.figure()
+    plt.imshow(drawing, cmap='gray')
+    plt.title('Drawing'), plt.xticks([]), plt.yticks([])
+
 
 
 def execute(th):
-    imgOr, imgTh, imgDl  = readImage(th, 'AS-OCT\im1.jpeg')
+    # impTodas(th)
+    imgOr, imgTh, imgDl = readImage(th, 'AS-OCT\im2.jpeg')
     imgCc, _ = cConexas(imgDl)
-    imgCc, regiones = cConexas2(imgCc)
+    imgCc, regiones = cConexas2(imgCc, "IMG 4")
+
+    # imgOr, imgTh, imgDl = readImage(th, 'AS-OCT\im9.jpeg')
+    # imgCc, _ = cConexas(imgDl)
+    # imgCc, regiones = cConexas2(imgCc, "IMG 9")
+    #
+    # imgOr, imgTh, imgDl = readImage(th, 'AS-OCT\im12.jpeg')
+    # imgCc, _ = cConexas(imgDl)
+    # imgCc, regiones = cConexas2(imgCc, "IMG 12")
+
 
     # plt.figure()
     # plt.imshow(imgDl, cmap='gray')
     # plt.title('D1'), plt.xticks([]), plt.yticks([])
 
     imgCombine = combine(imgOr, imgCc)
-
+    # a(imgCombine)
 
     rmb = reduceMiddleBorder(imgCombine,regiones)
-
-    # rmb = cv2.GaussianBlur(rmb, (4, 4), 0)
 
     rmb[rmb > 140] = 255
     rmb[rmb  <= 140] = 0
@@ -334,6 +385,58 @@ def execute(th):
     # imgCc = cConexas(imgTh)
     # showImage(imgOr, imgTh, imgCc)
 
+
+
+
+def impTodas(th):
+
+    imgOr, imgTh, imgDl = readImage(th, 'AS-OCT\im1.jpeg')
+    imgCc, _ = cConexas(imgDl)
+    imgCc, regiones = cConexas2(imgCc, "IMG 1")
+
+    imgOr, imgTh, imgDl = readImage(th, 'AS-OCT\im2.jpeg')
+    imgCc, _ = cConexas(imgDl)
+    imgCc, regiones = cConexas2(imgCc, "IMG 2")
+
+    imgOr, imgTh, imgDl = readImage(th, 'AS-OCT\im3.jpeg')
+    imgCc, _ = cConexas(imgDl)
+    imgCc, regiones = cConexas2(imgCc, "IMG 3")
+
+    imgOr, imgTh, imgDl = readImage(th, 'AS-OCT\im4.jpeg')
+    imgCc, _ = cConexas(imgDl)
+    imgCc, regiones = cConexas2(imgCc, "IMG 4")
+
+    imgOr, imgTh, imgDl = readImage(th, 'AS-OCT\im5.jpeg')
+    imgCc, _ = cConexas(imgDl)
+    imgCc, regiones = cConexas2(imgCc, "IMG 5")
+
+    imgOr, imgTh, imgDl = readImage(th, 'AS-OCT\im6.jpeg')
+    imgCc, _ = cConexas(imgDl)
+    imgCc, regiones = cConexas2(imgCc, "IMG 6")
+
+    imgOr, imgTh, imgDl = readImage(th, 'AS-OCT\im7.jpeg')
+    imgCc, _ = cConexas(imgDl)
+    imgCc, regiones = cConexas2(imgCc, "IMG 7")
+
+    imgOr, imgTh, imgDl = readImage(th, 'AS-OCT\im8.jpeg')
+    imgCc, _ = cConexas(imgDl)
+    imgCc, regiones = cConexas2(imgCc, "IMG 8")
+
+    imgOr, imgTh, imgDl = readImage(th, 'AS-OCT\im9.jpeg')
+    imgCc, _ = cConexas(imgDl)
+    imgCc, regiones = cConexas2(imgCc, "IMG 9")
+
+    imgOr, imgTh, imgDl = readImage(th, 'AS-OCT\im10.jpeg')
+    imgCc, _ = cConexas(imgDl)
+    imgCc, regiones = cConexas2(imgCc, "IMG 10")
+
+    imgOr, imgTh, imgDl = readImage(th, 'AS-OCT\im11.jpeg')
+    imgCc, _ = cConexas(imgDl)
+    imgCc, regiones = cConexas2(imgCc, "IMG 11")
+
+    imgOr, imgTh, imgDl = readImage(th, 'AS-OCT\im12.jpeg')
+    imgCc, _ = cConexas(imgDl)
+    imgCc, regiones = cConexas2(imgCc, "IMG 12")
 
 execute(90)
 plt.show()
