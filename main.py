@@ -32,8 +32,9 @@ def readImage (thigh, img):
     imgTh[imgTh < thigh] = 0
     imgTh[imgTh >= thigh] = 1
 
-    kernel = np.ones((1,10))
+    kernel = np.ones((2,10))
     imgDl = cv2.dilate(imgTh, kernel, iterations = 1)
+
 
     return imgOr, imgTh, imgDl
 
@@ -42,16 +43,12 @@ def newImage(image, regionCoords):
         image[i[0]][i[1]] = 1
     return image
 
-def cConexas(image, p = False):
+def cConexas(image):
 
     label_image = label(image)
-    image_label_overlay = label2rgb(image, image=image)
-
-    fig, ax = plt.subplots(figsize=(10, 6))
 
     imageComponentesConexas = np.zeros(image.shape)
 
-    ax.imshow(image_label_overlay)
     i = 0
     regions = []
     for region in regionprops(label_image):
@@ -65,8 +62,29 @@ def cConexas(image, p = False):
     # To return a new list, use the sorted() built-in function...
     regions = sorted(regions, key=lambda x: x.area, reverse=True)
 
-    regions= regions[0:3]
+    regions= regions[0:5]
     for region in regions:
+        # draw rectangle around segmented coins
+
+        imageComponentesConexas = newImage(imageComponentesConexas, region.coords)
+    return imageComponentesConexas, regions
+
+
+def cConexas2(image):
+
+    label_image = label(image)
+    image_label_overlay = label2rgb(image, image=image)
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    imageComponentesConexas = np.zeros(image.shape)
+
+    ax.imshow(image_label_overlay)
+    i = 0
+    regions = []
+    for region in regionprops(label_image):
+        # take regions with large enough areas
+        regions.append(region)
         # draw rectangle around segmented coins
         minr, minc, maxr, maxc = region.bbox
         if (i == 0):
@@ -93,9 +111,8 @@ def cConexas(image, p = False):
     ax.set_axis_off()
     plt.tight_layout()
     plt.imshow(imageComponentesConexas, cmap='gray')
-
+    plt.title('CC2')
     return imageComponentesConexas, regions
-
 
 def showImage(ori, th,  dl, cc):
     plt.figure()
@@ -164,9 +181,9 @@ def reduceBorders(img):
     filas, columnas = img.shape
     out = np.zeros((filas, columnas))
 
-    plt.figure()
-    plt.imshow(img, cmap='gray')
-    plt.title('IMG'), plt.xticks([]), plt.yticks([])
+    # plt.figure()
+    # plt.imshow(img, cmap='gray')
+    # plt.title('IMG'), plt.xticks([]), plt.yticks([])
 
     for i in range(columnas):
         blanco = True
@@ -192,29 +209,61 @@ def mediaTruncada(dist):
     trimean = scipy.stats.mstats.tmean(dist, (90, 130))
     print("La media recortada es =", trimean)
 
+def reduceMiddleBorder(img, regions):
+    # print(regions[1].coords)
+    tmp = np.zeros(img.shape)
+    a = newImage(tmp, regions[1].coords)
+    a = combine(img, a)
+    filas, columnas =  a.shape
+    for i in range(columnas):
+        max = 0
+        f = 0
+        c = 0
+        for j in range(filas):
+            if (a[j][i]> max):
+                max = a[j][i]
+                f = j
+                c = i
+            a[j][i] =0
+        if(f != 0):
+            img[f][c] = 255
+    return img
+
+
 
 def execute(th):
-    imgOr, imgTh, imgDl  = readImage(th, 'AS-OCT\im12.jpeg')
-    imgCc, regiones = cConexas(imgDl)
-    imgCombine = combine(imgOr, imgCc)
+    imgOr, imgTh, imgDl  = readImage(th, 'AS-OCT\im1.jpeg')
+    imgCc, _ = cConexas(imgDl)
+    imgCc, regiones = cConexas2(imgCc)
 
     # plt.figure()
-    # plt.imshow(imgCombine, cmap='gray')
-    # plt.title('Combine 1'), plt.xticks([]), plt.yticks([])
+    # plt.imshow(imgDl, cmap='gray')
+    # plt.title('D1'), plt.xticks([]), plt.yticks([])
+
+    imgCombine = combine(imgOr, imgCc)
 
 
-    imgCombine[imgCombine > 150] = 255
-    imgCombine[imgCombine <= 150] = 0
-    imgReduc = reduceBorders(imgCombine)
+    rmb = reduceMiddleBorder(imgCombine,regiones)
+
+    # rmb = cv2.GaussianBlur(rmb, (4, 4), 0)
+
+    rmb[rmb > 140] = 255
+    rmb[rmb  <= 140] = 0
+    imgReduc = reduceBorders(rmb )
 
     imgFin, _ = countPx(imgReduc)
     imgFin, capa1 = countPx(imgFin)
     imgFin, capa2 = countPx(imgFin)
-    mediaTruncada(capa1)
-    mediaTruncada(capa2)
+
+
+
+
+    # mediaTruncada(capa1)
+    # mediaTruncada(capa2)
+
+
     # imagem = cv2.bitwise_not(imgCombine)
     # imgFin = cConexas(imagem, True)
-
 
     # plt.figure()
     # plt.plot(imgOr[:, 0])
@@ -236,7 +285,6 @@ def execute(th):
     # plt.figure()
     # plt.imshow(imgCombine, cmap='gray')
     # plt.title('comb2'), plt.xticks([]), plt.yticks([])
-    plt.show()
 
 
 
@@ -288,3 +336,4 @@ def execute(th):
 
 
 execute(90)
+plt.show()

@@ -15,6 +15,22 @@ from skimage.color import label2rgb
 def readImage (thigh, img):
     imgOr = cv2.imread(img, 0)
 
+    median = cv2.medianBlur(imgOr,11)
+
+    diff  = np.abs(np.subtract(median, imgOr))
+
+    plt.figure()
+    plt.imshow(median, cmap='gray')
+    plt.title('MEDIAN'), plt.xticks([]), plt.yticks([])
+
+    plt.figure()
+    plt.imshow(diff, cmap='gray')
+    plt.title('DIFF'), plt.xticks([]), plt.yticks([])
+
+    plt.figure()
+    plt.imshow(imgOr, cmap='gray')
+    plt.title('ORIG'), plt.xticks([]), plt.yticks([])
+
     imgTh = cv2.imread(img, 0)
     imgTh = cv2.GaussianBlur(imgTh, (11, 11), 0)
     #imgTh = cv2.adaptiveThreshold(blur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
@@ -94,8 +110,8 @@ def showImage(ori, th, cc, dl):
 
 def execute(th):
     imgOr, imgTh, imgDl  = readImage(th, 'AS-OCT\im3.jpeg')
-    imgCc = cConexas(imgDl)
-    showImage(imgOr, imgTh, imgCc, imgDl)
+    # imgCc = cConexas(imgDl)
+    # showImage(imgOr, imgTh, imgCc, imgDl)
 
     # imgOr, imgTh = readImage(th, 'AS-OCT\im2.jpeg')
     # imgCc = cConexas(imgTh)
@@ -143,3 +159,4 @@ def execute(th):
 
 
 execute(90)
+plt.show()
