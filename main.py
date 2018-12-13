@@ -187,7 +187,7 @@ def countPx(img):
     filas, columnas = img.shape
     out = img.copy()
     totalPX = 0
-    valueComunas = np.zeros((1,columnas))
+    valueComunas = np.zeros(columnas)
     for i in range(columnas):
         countR1 = 0
 
@@ -201,7 +201,7 @@ def countPx(img):
             totalPX = totalPX+1
             countR1=countR1+1
             out[j][i] = 255
-        valueComunas[0][i]= countR1
+        valueComunas[i]= countR1
 
     plt.figure()
     plt.imshow(out, cmap='gray')
@@ -233,15 +233,31 @@ def reduceBorders(img):
 
     return out
 
-def mediaTruncada(dist):
-    print("MAX: ",max(max(dist)))
-    print("MIN: ", min(min(dist)))
-    # calculamos los percentile 25% y 75% y hallamos la media recortada
-    liminf = scipy.stats.scoreatpercentile(dist, 25)
-    limsup = scipy.stats.scoreatpercentile(dist, 75)
-    print("El 25% percentil es =", liminf, "y el 75% percentil es =", limsup)
-    trimean = scipy.stats.mstats.tmean(dist, (90, 130))
-    print("La media recortada es =", trimean)
+def desviacionTipica(dist):
+
+
+    dist = np.sort(dist)
+    size = len(dist)
+    fivePercent =  int(size*0.05)
+    fifteenPercent = int(size*0.15)
+
+
+    print(dist[fivePercent:(size-fifteenPercent)])
+    print(dist[fifteenPercent:(size-fivePercent)])
+    # print(fivePercent)
+    # print(fifteenPercent)
+    # print(size)
+
+    dTotal = np.var(dist)
+    dPrin = np.var(dist[fivePercent:(size-fifteenPercent)])
+    dFin = np.var(dist[fifteenPercent:(size-fivePercent)])
+    dEq = np.var(dist[fivePercent:(size-fivePercent)])
+
+    print(dTotal)
+    print(dPrin)
+    print(dFin)
+    print(dEq)
+
 
 def reduceMiddleBorder(img, regions):
     # print(regions[1].coords)
@@ -310,7 +326,7 @@ def a(img):
 
 def execute(th):
     # impTodas(th)
-    imgOr, imgTh, imgDl = readImage(th, 'AS-OCT\im12.jpeg')
+    imgOr, imgTh, imgDl = readImage(th, 'AS-OCT\im3.jpeg')
     imgCc, _ = cConexas(imgDl)
 
 
@@ -344,6 +360,7 @@ def execute(th):
     imgFin, capa1 = countPx(imgFin)
     imgFin, capa2 = countPx(imgFin)
 
+    desviacionTipica(capa1)
 
 
 

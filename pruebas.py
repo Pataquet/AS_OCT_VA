@@ -134,8 +134,13 @@ def showImage(ori, th, cc, dl):
     plt.title('CC Image'), plt.xticks([]), plt.yticks([])
 
 
+
+
+
 def execute(th):
     imgOr, imgTh, imgDl  = readImage(th, 'AS-OCT\im3.jpeg')
+
+
     # imgCc = cConexas(imgDl)
     # showImage(imgOr, imgTh, imgCc, imgDl)
 
