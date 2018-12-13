@@ -18,7 +18,7 @@ def readImage (thigh, img):
     imgOr = cv2.imread(img, 0)
 
     imgTh = cv2.imread(img, 0)
-    imgTh = ndimage.grey_opening(imgTh, size=(3, 3))
+    imgTh = ndimage.grey_opening(imgTh, size=(3, 4))
 
     imgTh = cv2.GaussianBlur(imgTh, (11, 11), 0)
     #imgTh = cv2.adaptiveThreshold(blur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
@@ -34,8 +34,8 @@ def readImage (thigh, img):
     imgTh[imgTh < thigh] = 0
     imgTh[imgTh >= thigh] = 1
 
-    # kernel = np.ones((1, 5))
-    # imgDl = cv2.erode(imgTh, kernel, iterations=1)
+    kernel = np.ones((1, 5))
+    imgTh = cv2.erode(imgTh, kernel, iterations=1)
 
     kernel = np.ones((2,15))
     imgDl = cv2.dilate(imgTh, kernel, iterations = 1)
@@ -52,7 +52,6 @@ def newImage(image, regionCoords):
 def cConexas(image):
 
     label_image = label(image)
-
     imageComponentesConexas = np.zeros(image.shape)
 
     regions = []
@@ -61,25 +60,46 @@ def cConexas(image):
         if region.area >= 1000:
             regions.append(region)
 
-    # To sort the list in place...
-    regions.sort(key=lambda x: x.area, reverse=True)
+    for region in regions:
+        imageComponentesConexas = newImage(imageComponentesConexas, region.coords)
 
-    # To return a new list, use the sorted() built-in function...
+
+
+
+    kernel = np.ones((3, 9))
+    imageComponentesConexas = cv2.morphologyEx(imageComponentesConexas, cv2.MORPH_CLOSE, kernel)
+
+
+
+    label_image = label(imageComponentesConexas)
+    imageComponentesConexas = np.zeros(image.shape)
+
+    regions = []
+    for region in regionprops(label_image):
+        # take regions with large enough areas
+        if region.area >= 2000:
+            regions.append(region)
+
+    regions.sort(key=lambda x: x.area, reverse=True)
     regions = sorted(regions, key=lambda x: x.area, reverse=True)
 
-    # regions= regions[0:5]
+    regions = regions[0:5]
+
     for region in regions:
         imageComponentesConexas = newImage(imageComponentesConexas, region.coords)
 
     return imageComponentesConexas, regions
 
-def unionCC(regions):
-
-    for region in regions:
-        minr1, minc1, maxr1, maxc1 = region.bbox
-        for region in regions:
-            minr2, minc2, maxr2, maxc2 = region.bbox
-            if(minc1==minc2 and minr1 == minr2 and maxc1== maxc2 and maxr1== maxr2 ): continue
+# def unionCC(regions):
+#
+#     for r in regions:
+#         minr1, minc1, maxr1, maxc1 = regions[r].bbox
+#         ltmp = []
+#         for i in range(len(regions)):
+#             minr2, minc2, maxr2, maxc2 = regions[i].bbox
+#             if(minc1==minc2 and minr1 == minr2 and maxc1== maxc2 and maxr1== maxr2 ): continue
+#             if (minr1<minr2 and maxr1> maxr2):
+#                 ltmp.append()
 
         
 
@@ -227,6 +247,7 @@ def reduceMiddleBorder(img, regions):
     # print(regions[1].coords)
     tmp = np.zeros(img.shape)
     a = newImage(tmp, regions[1].coords)
+    # print(regions[1].coords)
     a = combine(img, a)
     filas, columnas =  a.shape
     for i in range(columnas):
@@ -240,7 +261,20 @@ def reduceMiddleBorder(img, regions):
                 c = i
             a[j][i] =0
         if(f != 0):
-            img[f][c] = 255
+            # img[f][c] = 255
+            tmp[f][c] = 255
+
+    for i in regions[1].coords:
+        img[i[0]][i[1]] = 0
+
+    for i in range(filas):
+        for j in range(columnas):
+            if(tmp[i][j] == 255):
+                img[i][j]=255
+    plt.figure()
+    plt.imshow(img, cmap='gray')
+    plt.title('MIDDLE'), plt.xticks([]), plt.yticks([])
+
     return img
 
 def a(img):
@@ -276,9 +310,13 @@ def a(img):
 
 def execute(th):
     # impTodas(th)
-    imgOr, imgTh, imgDl = readImage(th, 'AS-OCT\im2.jpeg')
+    imgOr, imgTh, imgDl = readImage(th, 'AS-OCT\im12.jpeg')
     imgCc, _ = cConexas(imgDl)
+
+
     imgCc, regiones = cConexas2(imgCc, "IMG 4")
+
+
 
     # imgOr, imgTh, imgDl = readImage(th, 'AS-OCT\im9.jpeg')
     # imgCc, _ = cConexas(imgDl)
@@ -298,8 +336,8 @@ def execute(th):
 
     rmb = reduceMiddleBorder(imgCombine,regiones)
 
-    rmb[rmb > 140] = 255
-    rmb[rmb  <= 140] = 0
+    rmb[rmb > 120] = 255
+    rmb[rmb  <= 120] = 0
     imgReduc = reduceBorders(rmb )
 
     imgFin, _ = countPx(imgReduc)
@@ -438,5 +476,5 @@ def impTodas(th):
     imgCc, _ = cConexas(imgDl)
     imgCc, regiones = cConexas2(imgCc, "IMG 12")
 
-execute(90)
+execute(80)
 plt.show()
