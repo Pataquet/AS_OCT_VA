@@ -2,6 +2,8 @@ import cv2
 import numpy as np
 import scipy.stats
 
+import positions
+
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from scipy import ndimage
@@ -188,9 +190,11 @@ def countPx(img):
     out = img.copy()
     totalPX = 0
     valueComunas = np.zeros(columnas)
+    dist = []
+
     for i in range(columnas):
         countR1 = 0
-
+        posInit =[]
         blanco = True
         for j in range(filas):
             if(img[j][i] == 0):blanco = False
@@ -198,17 +202,22 @@ def countPx(img):
 
             if(img[j][i] == 255):
                 break
+            if(countR1 == 0):
+                posInit = j
             totalPX = totalPX+1
             countR1=countR1+1
             out[j][i] = 255
+        dist.append(positions.Positions(i, posInit, posInit + countR1))
         valueComunas[i]= countR1
 
+
+    print(dist[0].colum)
     plt.figure()
     plt.imshow(out, cmap='gray')
     plt.title('Parts'), plt.xticks([]), plt.yticks([])
 
-    print("Nº total de px: ",totalPX)
-    print("Media PX: ", totalPX/columnas)
+    # print("Nº total de px: ",totalPX)
+    # print("Media PX: ", totalPX/columnas)
     return out, valueComunas
 
 def reduceBorders(img):
