@@ -15,7 +15,9 @@ from skimage.measure import label, regionprops
 from skimage.morphology import closing, square
 from skimage.color import label2rgb
 
-
+#interpolacion
+# regresion robusta
+#runsac
 def readImage (thigh, img):
     imgOr = cv2.imread(img, 0)
 
@@ -220,6 +222,22 @@ def countPx(img):
     # print("Media PX: ", totalPX/columnas)
     return out, valueComunas
 
+def calculateDist(dist):
+    listInit = np.zeros((1,len(dist)))
+    listFin = np.zeros((1,len(dist)))
+
+    for i in range(len(dist)):
+        listInit[0][i]= dist[i].inicio
+        listFin[0][i]= dist[i].fin
+
+    gaussInit = cv2.GaussianBlur(listInit, (1, 11), 20)
+    gaussFin = cv2.GaussianBlur(listFin, (1, 11), 20)
+
+    distancias =  np.subtract(gaussFin, gaussInit)
+
+
+
+
 def reduceBorders(img):
     filas, columnas = img.shape
     out = np.zeros((filas, columnas))
@@ -274,7 +292,7 @@ def reduceMiddleBorder(img, regions):
     a = newImage(tmp, regions[1].coords)
     # print(regions[1].coords)
     a = combine(img, a)
-    filas, columnas =  a.shape
+    filas, columnas = a.shape
     for i in range(columnas):
         max = 0
         f = 0
@@ -302,40 +320,10 @@ def reduceMiddleBorder(img, regions):
 
     return img
 
-def a(img):
-
-    ret, thresh = cv2.threshold(img, 50, 255, cv2.THRESH_BINARY)
-    # Finding contours for the thresholded image
-    im2, contours, hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-
-    # create hull array for convex hull points
-    hull = []
-
-    # calculate points for each contour
-    for i in range(len(contours)):
-        # creating convex hull object for each contour
-        hull.append(cv2.convexHull(contours[i], False))
-    # create an empty black image
-    drawing = np.zeros((thresh.shape[0], thresh.shape[1], 3), np.uint8)
-
-    # draw contours and hull points
-    for i in range(len(contours)):
-        color_contours = (0, 255, 0)  # green - color for contours
-        color = (255, 0, 0)  # blue - color for convex hull
-        # draw ith contour
-        cv2.drawContours(drawing, contours, i, color_contours, 1, 8, hierarchy)
-        # draw ith convex hull object
-        cv2.drawContours(drawing, hull, i, color, 1, 8)
-
-    plt.figure()
-    plt.imshow(drawing, cmap='gray')
-    plt.title('Drawing'), plt.xticks([]), plt.yticks([])
-
-
 
 def execute(th):
     # impTodas(th)
-    imgOr, imgTh, imgDl = readImage(th, 'AS-OCT\im3.jpeg')
+    imgOr, imgTh, imgDl = readImage(th, 'AS-OCT\im12.jpeg')
     imgCc, _ = cConexas(imgDl)
 
 
