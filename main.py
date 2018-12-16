@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 import scipy.stats
+from scipy.signal import argrelextrema
 
 import positions
 
@@ -196,7 +197,7 @@ def countPx(img):
 
     for i in range(columnas):
         countR1 = 0
-        posInit =[]
+        posInit = 0
         blanco = True
         for j in range(filas):
             if(img[j][i] == 0):blanco = False
@@ -209,34 +210,46 @@ def countPx(img):
             totalPX = totalPX+1
             countR1=countR1+1
             out[j][i] = 255
+
         dist.append(positions.Positions(i, posInit, posInit + countR1))
         valueComunas[i]= countR1
 
 
-    print(dist[0].colum)
+    # print(dist[0].colum)
     plt.figure()
     plt.imshow(out, cmap='gray')
     plt.title('Parts'), plt.xticks([]), plt.yticks([])
 
     # print("Nº total de px: ",totalPX)
     # print("Media PX: ", totalPX/columnas)
-    return out, valueComunas
+
+    return out, dist
 
 def calculateDist(dist):
-    listInit = np.zeros((1,len(dist)))
-    listFin = np.zeros((1,len(dist)))
+    listInit = np.zeros(len(dist))
+    listFin = np.zeros(len(dist))
+    listDist = np.zeros(len(dist))
 
     for i in range(len(dist)):
-        listInit[0][i]= dist[i].inicio
-        listFin[0][i]= dist[i].fin
+        listInit[i]= dist[i].inicio
+        listFin[i]= dist[i].fin
+        listDist[i] = dist[i].distancia
 
-    gaussInit = cv2.GaussianBlur(listInit, (1, 11), 20)
-    gaussFin = cv2.GaussianBlur(listFin, (1, 11), 20)
+    gaussInit = ndimage.gaussian_filter1d(listInit, 20)
+    gaussFin = ndimage.gaussian_filter1d(listFin, 20)
 
-    distancias =  np.subtract(gaussFin, gaussInit)
+    distancias = np.abs(np.subtract(gaussFin, gaussInit))
+    for i in  range(len(distancias)):
+        dist[i].distanciaSuav = distancias[i]
 
+    plt.figure()
+    plt.plot(distancias)
+    plt.title("SUAVIZADAAAAAA")
 
-
+    plt.figure()
+    plt.plot(listDist)
+    plt.title("SIIIIINNNNN")
+    desviacionTipica(dist)
 
 def reduceBorders(img):
     filas, columnas = img.shape
@@ -261,29 +274,147 @@ def reduceBorders(img):
     return out
 
 def desviacionTipica(dist):
-
-
-    dist = np.sort(dist)
     size = len(dist)
     fivePercent =  int(size*0.05)
     fifteenPercent = int(size*0.15)
+    twentyPercent = int(size*0.20)
+    twentyFivePercent = int(size * 0.25)
+
+    dist.sort(key=lambda x: x.distanciaSuav, reverse=True)
+    dist = sorted(dist, key=lambda x: x.distanciaSuav, reverse=True)
+
+    dTotal = np.var([f.distanciaSuav for f in dist])
+
+    if (dTotal > 50):
+
+        dPrin = np.var([f.distanciaSuav for f in dist[fivePercent:(size-fifteenPercent)]])
+        dFin = np.var([f.distanciaSuav for f in dist[fifteenPercent:(size-fivePercent)]])
+        if(dFin > dPrin):
+            if(dPrin > 100):
+                dPrin = np.var([f.distanciaSuav for f in dist[fivePercent:(size - twentyPercent)]])
+                if(dPrin > 100):
+                    dPrin = np.var([f.distanciaSuav for f in dist[fivePercent:(size - twentyFivePercent)]])
+                    valuePrin = fivePercent
+                    valueFin = twentyFivePercent
+                else:
+                    valuePrin = fivePercent
+                    valueFin = twentyPercent
+            else:
+                valuePrin = fivePercent
+                valueFin = fifteenPercent
+        else :
+            if (dFin > 100):
+                dFin = np.var([f.distanciaSuav for f in dist[twentyPercent:(size - fivePercent)]])
+                if (dFin> 100):
+                    dFin = np.var([f.distanciaSuav for f in dist[twentyFivePercent:(size - fivePercent)]])
+                    valuePrin = twentyFivePercent
+                    valueFin = fivePercent
+                else:
+                    valuePrin = twentyPercent
+                    valueFin = fivePercent
+            else:
+                valuePrin = fifteenPercent
+                valueFin =fivePercent
+    else :
+        print("EEEEEEQQQQQQQQ")
+        valuePrin = 0
+        valueFin = 0
+    print(valuePrin)
+    print(valueFin)
+
+    for i in range(valuePrin):
+        dist[i].distanciaSuav = -1
+
+    for i in range(size-valueFin, size):
+        dist[i].distanciaSuav = -1
 
 
-    print(dist[fivePercent:(size-fifteenPercent)])
-    print(dist[fifteenPercent:(size-fivePercent)])
-    # print(fivePercent)
-    # print(fifteenPercent)
-    # print(size)
+    dist.sort(key=lambda x: x.colum)
+    dist = sorted(dist, key=lambda x: x.colum)
 
-    dTotal = np.var(dist)
-    dPrin = np.var(dist[fivePercent:(size-fifteenPercent)])
-    dFin = np.var(dist[fifteenPercent:(size-fivePercent)])
-    dEq = np.var(dist[fivePercent:(size-fivePercent)])
+    tmp = np.zeros(int(size))
 
-    print(dTotal)
-    print(dPrin)
-    print(dFin)
-    print(dEq)
+    for i in range(int(size)):
+        tmp[i] = dist[i].distanciaSuav
+
+    localMaxim =argrelextrema(tmp, np.greater)
+    print(localMaxim[0])
+
+    plt.figure()
+    plt.plot([f.distanciaSuav for f in dist])
+    plt.title("DESVIACION TIPICA")
+
+    unionMaxLocal(localMaxim[0], dist)
+    # print([f.distanciaSuav for f in dist])
+
+def unionMaxLocal(localMax, points):
+    sizePoints = int(len(points))
+    sizeMax = int(len(localMax))
+    localAntSig = []
+    negativos = False
+    for i in range(sizePoints):
+        if (not negativos):
+            if(points[i].distanciaSuav == -1):
+                print(points[i].distanciaSuav)
+                negativos= True
+                if(i > localMax[sizeMax-1]):
+                    localAntSig.append([localMax[sizeMax-1], localMax[sizeMax-1]])
+                else:
+                    for j in range(sizeMax):
+                        if(localMax[j] > i):
+                            if(j == 0):
+                                localAntSig.append([localMax[j], localMax[j]])
+                            else:
+                                localAntSig.append([localMax[j-1], localMax[j]])
+                            break
+        else:
+            if (points[i].distanciaSuav != -1):
+                negativos = False
+
+    print(localAntSig)
+
+    for i in range(len(localAntSig)):
+        points = lineFromPoints(localAntSig[i], localMax, points)
+
+    plt.figure()
+    plt.plot([f.distanciaSuav for f in points])
+    plt.title("CREAR LINEAS")
+
+
+def lineFromPoints(localAntSig, localMax, points):
+
+    P = [localAntSig[0], points[localAntSig[0]].distanciaSuav]
+    Q = [localAntSig[1], points[localAntSig[1]].distanciaSuav]
+
+    a = Q[1] - P[1]
+    b = P[0] - Q[0]
+    c = a * (P[0]) + b * (P[1])
+
+    if (localAntSig[0] != localAntSig[1]):
+        print("DENTROOOOOOOOO")
+        for i in range(localAntSig[0], localAntSig[1]):
+            points[i].distanciaSuav =  (c - a*i)/b
+    else:
+        print("MAAAAAAAAAAAAAL")
+
+        if(localMax[0] == localAntSig[1]):
+            print("PRINCIPIOOOOO")
+            for i in range(localAntSig[1]):
+                points[i].distanciaSuav = points[localAntSig[0]].distanciaSuav
+        elif(localMax[len(localMax)-1] == localAntSig[1]):
+            print("FIIIIIIN")
+
+            for i in range(localAntSig[1],len(points)):
+                points[i].distanciaSuav = points[localAntSig[0]].distanciaSuav
+
+    return points
+    # if (b < 0):
+    #     print("The line passing through points P and Q is:",
+    #           a, "x ", b, "y = ", c, "\n")
+    # else:
+    #     print("The line passing through points P and Q is: ",
+    #           a, "x + ", b, "y = ", c, "\n")
+
 
 
 def reduceMiddleBorder(img, regions):
@@ -357,7 +488,8 @@ def execute(th):
     imgFin, capa1 = countPx(imgFin)
     imgFin, capa2 = countPx(imgFin)
 
-    desviacionTipica(capa1)
+    calculateDist(capa2)
+    # desviacionTipica(capa1)
 
 
 
