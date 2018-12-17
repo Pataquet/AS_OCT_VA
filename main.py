@@ -245,19 +245,38 @@ def calcularError(dist):
         valueFin = 0
     return valuePrin, valueFin
 
+def calcularErro2(dist):
+    print("pricipio")
+    d = dist.copy()
+    for i in range(len(d)):
+        # d[i].distanciaSuav = abs(d[i].distanciaSuav - d[i].distancia)
+        if((abs(d[i].distanciaSuav - d[i].distancia))>20):
+            d[i].distanciaSuav = -1
+    plt.figure()
+    plt.plot([f.distanciaSuav for f in d])
+    plt.title("PRUEBA BLUR")
+
+    plt.figure()
+    plt.plot([f.distancia for f in dist])
+    plt.title("PRUEBA DIST")
+    print("fin")
+    return d
+
 def desviacionTipica(dist):
     size = len(dist)
 
+    tmp= dist.copy()
+    calcularErro2(tmp)
     valuePrin, valueFin = calcularError(dist)
+
     print(valuePrin)
     print(valueFin)
 
-    for i in range(valuePrin):
-        dist[i].distanciaSuav = -1
-
-    for i in range(size-valueFin, size):
-        dist[i].distanciaSuav = -1
-
+    # for i in range(valuePrin):
+    #     dist[i].distanciaSuav = -1
+    #
+    # for i in range(size-valueFin, size):
+    #     dist[i].distanciaSuav = -1
 
     dist.sort(key=lambda x: x.colum)
     dist = sorted(dist, key=lambda x: x.colum)
@@ -271,8 +290,10 @@ def desviacionTipica(dist):
         tmp[i] = dist[i].distanciaSuav
     if(valueFin == 0):
         localMaxim = argrelextrema(tmp, np.less)
+        print("Minimos")
     else:
         localMaxim = argrelextrema(tmp, np.greater)
+        print("Maximos")
 
     print(localMaxim[0])
     desviacionTipica = [f.distanciaSuav for f in dist]
@@ -384,10 +405,10 @@ def execute(imagen):
 
     distOr1, distSuv1, distDP1, distML1 = calculateDist(capa1)
 
-    distOr2, distSuv2, distDP2, distML2 = calculateDist(capa2)
+    # distOr2, distSuv2, distDP2, distML2 = calculateDist(capa2)
 
     m.showStadistics(distOr1, distSuv1, distDP1, distML1, "Original 1", "Blur 1", "Desv Tipica 1", "Union 1")
-    m.showStadistics(distOr2, distSuv2, distDP2, distML2, "Original 2", "Blur 2", "Desv Tipica 2", "Union 2")
+    # m.showStadistics(distOr2, distSuv2, distDP2, distML2, "Original 2", "Blur 2", "Desv Tipica 2", "Union 2")
 
-execute('AS-OCT\im11.jpeg')
+execute('AS-OCT\im12.jpeg')
 plt.show()
