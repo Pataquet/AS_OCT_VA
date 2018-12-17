@@ -194,9 +194,8 @@ def reduceBorders(img):
                 blanco= True
     return out
 
-def desviacionTipica(dist):
+def calcularError(dist):
     size = len(dist)
-    fivePercent =  int(size*0.05)
     fifteenPercent = int(size*0.15)
     twentyPercent = int(size*0.20)
     twentyFivePercent = int(size * 0.25)
@@ -204,41 +203,52 @@ def desviacionTipica(dist):
     dist.sort(key=lambda x: x.distanciaSuav, reverse=True)
     dist = sorted(dist, key=lambda x: x.distanciaSuav, reverse=True)
 
-    dTotal = np.var([f.distanciaSuav for f in dist])
+    dTotalDist = np.var([f.distancia for f in dist])
+    dTotalDistBlur = np.var([f.distanciaSuav for f in dist])
+    print("DT DIST: ", dTotalDist)
+    print("DT SUAVE: ", dTotalDistBlur)
+    if (abs(dTotalDist - dTotalDistBlur) > 50):
 
-    if (dTotal > 50):
+        dPrin = np.var([f.distancia for f in dist[:(size-fifteenPercent)]])
+        dFin = np.var([f.distancia for f in dist[fifteenPercent:size]])
 
-        dPrin = np.var([f.distanciaSuav for f in dist[fivePercent:(size-fifteenPercent)]])
-        dFin = np.var([f.distanciaSuav for f in dist[fifteenPercent:(size-fivePercent)]])
         if(dFin > dPrin):
+            dPrin = np.var([f.distanciaSuav for f in dist[:(size - twentyPercent)]])
             if(dPrin > 100):
-                dPrin = np.var([f.distanciaSuav for f in dist[fivePercent:(size - twentyPercent)]])
+                dPrin = np.var([f.distanciaSuav for f in dist[:(size - twentyPercent)]])
                 if(dPrin > 100):
-                    dPrin = np.var([f.distanciaSuav for f in dist[fivePercent:(size - twentyFivePercent)]])
-                    valuePrin = fivePercent
+                    dPrin = np.var([f.distanciaSuav for f in dist[:(size - twentyFivePercent)]])
+                    valuePrin = 0
                     valueFin = twentyFivePercent
                 else:
-                    valuePrin = fivePercent
+                    valuePrin = 0
                     valueFin = twentyPercent
             else:
-                valuePrin = fivePercent
+                valuePrin = 0
                 valueFin = fifteenPercent
         else :
+            dFin = np.var([f.distanciaSuav for f in dist[twentyPercent:]])
             if (dFin > 100):
-                dFin = np.var([f.distanciaSuav for f in dist[twentyPercent:(size - fivePercent)]])
+                dFin = np.var([f.distanciaSuav for f in dist[twentyPercent:]])
                 if (dFin> 100):
-                    dFin = np.var([f.distanciaSuav for f in dist[twentyFivePercent:(size - fivePercent)]])
+                    dFin = np.var([f.distanciaSuav for f in dist[twentyFivePercent:]])
                     valuePrin = twentyFivePercent
-                    valueFin = fivePercent
+                    valueFin = 0
                 else:
                     valuePrin = twentyPercent
-                    valueFin = fivePercent
+                    valueFin = 0
             else:
                 valuePrin = fifteenPercent
-                valueFin =fivePercent
+                valueFin =0
     else :
         valuePrin = 0
         valueFin = 0
+    return valuePrin, valueFin
+
+def desviacionTipica(dist):
+    size = len(dist)
+
+    valuePrin, valueFin = calcularError(dist)
     print(valuePrin)
     print(valueFin)
 
@@ -257,11 +267,15 @@ def desviacionTipica(dist):
     for i in range(int(size)):
         tmp[i] = dist[i].distanciaSuav
 
-    localMaxim =argrelextrema(tmp, np.greater)
+    for i in range(int(size)):
+        tmp[i] = dist[i].distanciaSuav
+    if(valueFin == 0):
+        localMaxim = argrelextrema(tmp, np.less)
+    else:
+        localMaxim = argrelextrema(tmp, np.greater)
+
     print(localMaxim[0])
-
-
-    desviacionTipica= [f.distanciaSuav for f in dist]
+    desviacionTipica = [f.distanciaSuav for f in dist]
     union = unionMaxLocal(localMaxim[0], dist)
 
     return desviacionTipica, union
@@ -368,9 +382,12 @@ def execute(imagen):
 
     m.showImage3(imgReg1, imgReg2, imgReg3, "PX R1", "PX R2", "PX R3")
 
-    distOr, distSuv, distDP, distML = calculateDist(capa2)
+    distOr1, distSuv1, distDP1, distML1 = calculateDist(capa1)
 
-    m.showStadistics(distOr, distSuv, distDP, distML, "Original", "Blur", "Desv Tipica", "Union")
+    distOr2, distSuv2, distDP2, distML2 = calculateDist(capa2)
 
-execute('AS-OCT\im12.jpeg')
+    m.showStadistics(distOr1, distSuv1, distDP1, distML1, "Original 1", "Blur 1", "Desv Tipica 1", "Union 1")
+    m.showStadistics(distOr2, distSuv2, distDP2, distML2, "Original 2", "Blur 2", "Desv Tipica 2", "Union 2")
+
+execute('AS-OCT\im11.jpeg')
 plt.show()
