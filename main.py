@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 from scipy.signal import argrelextrema
-
+from scipy.signal import find_peaks
 import positions
 import mostrarPasos as m
 
@@ -119,6 +119,47 @@ def cConexas2(image):
     plt.title("CC Finales")
     return imageComponentesConexas, regions
 
+def reduceBorders(img):
+    filas, columnas = img.shape
+    out = np.zeros((filas, columnas))
+
+    for i in range(columnas):
+        blanco = True
+        for j in range(filas):
+            if(img[j][i] == 0): blanco = False
+            if(blanco): continue
+            if((not blanco) and img[j][i] == 255):
+                out[j][i] = 255
+                blanco= True
+    return out
+
+def reduceMiddleBorder(img, regions):
+    tmp = np.zeros(img.shape)
+    a = newImage(tmp, regions[1].coords)
+    a = combine(img, a)
+    filas, columnas = a.shape
+    for i in range(columnas):
+        max = 0
+        f = 0
+        c = 0
+        for j in range(filas):
+            if (a[j][i]> max):
+                max = a[j][i]
+                f = j
+                c = i
+            a[j][i] =0
+        if(f != 0):
+            tmp[f][c] = 255
+
+    for i in regions[1].coords:
+        img[i[0]][i[1]] = 0
+
+    for i in range(filas):
+        for j in range(columnas):
+            if(tmp[i][j] == 255):
+                img[i][j]=255
+    return img
+
 def combine(original, regions):
     filas, columnas = original.shape
 
@@ -159,7 +200,20 @@ def countPx(img):
         valueComunas[i]= countR1
 
     return out, dist
-
+def localMax(list):
+    size = len(list)
+    lm = []
+    for i in range(size):
+        if(i == 0):
+            if (list[i]>list[i+1]):
+                lm.append(i)
+        elif(i == size-1):
+            if (list[i]>list[i-1]):
+                lm.append(i)
+        else:
+            if (list[i]>list[i+1] and list[i]>list[i-1]):
+                lm.append(i)
+    return lm
 def calculateDist(dist):
     listInit = np.zeros(len(dist))
     listFin = np.zeros(len(dist))
@@ -177,22 +231,15 @@ def calculateDist(dist):
     for i in  range(len(distancias)):
         dist[i].distanciaSuav = distancias[i]
 
+    dist2 = []
+    for i in range(len(dist)):
+        dist2.append(positions.Positions(dist[i].colum, dist[i].inicio, dist[i].fin))
+        dist2[i].distanciaSuav = dist[i].distanciaSuav
+
+    # calcularErro2(dist2)
     dt , ml = desviacionTipica(dist)
     return listDist, distancias, dt, ml
 
-def reduceBorders(img):
-    filas, columnas = img.shape
-    out = np.zeros((filas, columnas))
-
-    for i in range(columnas):
-        blanco = True
-        for j in range(filas):
-            if(img[j][i] == 0): blanco = False
-            if(blanco): continue
-            if((not blanco) and img[j][i] == 255):
-                out[j][i] = 255
-                blanco= True
-    return out
 
 def calcularError(dist):
     size = len(dist)
@@ -246,37 +293,64 @@ def calcularError(dist):
     return valuePrin, valueFin
 
 def calcularErro2(dist):
-    print("pricipio")
-    d = dist.copy()
-    for i in range(len(d)):
-        # d[i].distanciaSuav = abs(d[i].distanciaSuav - d[i].distancia)
-        if((abs(d[i].distanciaSuav - d[i].distancia))>20):
-            d[i].distanciaSuav = -1
-    plt.figure()
-    plt.plot([f.distanciaSuav for f in d])
-    plt.title("PRUEBA BLUR")
+    size = int(len(dist))
 
-    plt.figure()
-    plt.plot([f.distancia for f in dist])
-    plt.title("PRUEBA DIST")
-    print("fin")
-    return d
+    countPos = 0
+    countNeg = 0
+    blur =  [f.distanciaSuav for f in dist]
+    tmp = np.zeros(int(size))
+    for i in range(int(size)):
+        tmp[i] = dist[i].distanciaSuav
+
+    for i in range(size):
+        # d[i].distanciaSuav = abs(d[i].distanciaSuav - d[i].distancia)
+        error = dist[i].distanciaSuav - dist[i].distancia
+        if (error > 20):
+            countPos+= 1
+        elif (-20 > error):
+            countNeg+= 1
+        if(abs(error)>20):
+            dist[i].distanciaSuav = -1
+
+    if(countNeg > countPos ):
+        # localMaxim = argrelextrema(tmp, np.less)
+        l = argrelextrema(tmp, np.less)
+        l = l[0]
+        print("Minimos")
+    else:
+        # l = argrelextrema(tmp, np.greater)
+        print("Maximos")
+        l= localMax(tmp)
+    print(l)
+    localMaxim = []
+    for i in range(len(l)):
+        if(dist[l[i]].distanciaSuav!= -1):
+            localMaxim.append(l[i])
+    print("ERROR POSITIVO: ", countPos)
+    print("ERROR NEGATIVO: ", countNeg)
+
+    print(localMaxim)
+
+    union = unionMaxLocal(localMaxim, dist)
+    dReal= [f.distancia for f in dist]
+    dSuvMod= [f.distanciaSuav for f in dist]
+
+    m.showStadistics(dReal, blur, dSuvMod ,union, "Original", "Blur", "ERROR", "Union", "ERROR LOCAL")
+
 
 def desviacionTipica(dist):
     size = len(dist)
 
-    tmp= dist.copy()
-    calcularErro2(tmp)
     valuePrin, valueFin = calcularError(dist)
 
     print(valuePrin)
     print(valueFin)
 
-    # for i in range(valuePrin):
-    #     dist[i].distanciaSuav = -1
-    #
-    # for i in range(size-valueFin, size):
-    #     dist[i].distanciaSuav = -1
+    for i in range(valuePrin):
+        dist[i].distanciaSuav = -1
+
+    for i in range(size-valueFin, size):
+        dist[i].distanciaSuav = -1
 
     dist.sort(key=lambda x: x.colum)
     dist = sorted(dist, key=lambda x: x.colum)
@@ -289,15 +363,22 @@ def desviacionTipica(dist):
     for i in range(int(size)):
         tmp[i] = dist[i].distanciaSuav
     if(valueFin == 0):
-        localMaxim = argrelextrema(tmp, np.less)
+        # localMaxim = argrelextrema(tmp, np.less)
+        l = argrelextrema(tmp, np.less)
+        l = l[0]
         print("Minimos")
     else:
-        localMaxim = argrelextrema(tmp, np.greater)
+        # l = argrelextrema(tmp, np.greater)
         print("Maximos")
-
-    print(localMaxim[0])
+        l = localMax(tmp)
+    print(l)
+    localMaxim = []
+    for i in range(len(l)):
+        if (dist[l[i]].distanciaSuav != -1):
+            localMaxim.append(l[i])
+    print(localMaxim)
     desviacionTipica = [f.distanciaSuav for f in dist]
-    union = unionMaxLocal(localMaxim[0], dist)
+    union = unionMaxLocal(localMaxim, dist)
 
     return desviacionTipica, union
 
@@ -355,32 +436,6 @@ def lineFromPoints(localAntSig, localMax, points):
 
     return points
 
-def reduceMiddleBorder(img, regions):
-    tmp = np.zeros(img.shape)
-    a = newImage(tmp, regions[1].coords)
-    a = combine(img, a)
-    filas, columnas = a.shape
-    for i in range(columnas):
-        max = 0
-        f = 0
-        c = 0
-        for j in range(filas):
-            if (a[j][i]> max):
-                max = a[j][i]
-                f = j
-                c = i
-            a[j][i] =0
-        if(f != 0):
-            tmp[f][c] = 255
-
-    for i in regions[1].coords:
-        img[i[0]][i[1]] = 0
-
-    for i in range(filas):
-        for j in range(columnas):
-            if(tmp[i][j] == 255):
-                img[i][j]=255
-    return img
 
 
 def execute(imagen):
@@ -403,12 +458,13 @@ def execute(imagen):
 
     m.showImage3(imgReg1, imgReg2, imgReg3, "PX R1", "PX R2", "PX R3")
 
+    # calculateDist(capa1)
+    # calculateDist(capa2)
     distOr1, distSuv1, distDP1, distML1 = calculateDist(capa1)
+    distOr2, distSuv2, distDP2, distML2 = calculateDist(capa2)
 
-    # distOr2, distSuv2, distDP2, distML2 = calculateDist(capa2)
+    m.showStadistics(distOr1, distSuv1, distDP1, distML1, "Original 1", "Blur 1", "Desv Tipica 1", "Union 1", "DESVIACION TIPICA")
+    m.showStadistics(distOr2, distSuv2, distDP2, distML2, "Original 2", "Blur 2", "Desv Tipica 2", "Union 2", "DESVIACION TIPICA")
 
-    m.showStadistics(distOr1, distSuv1, distDP1, distML1, "Original 1", "Blur 1", "Desv Tipica 1", "Union 1")
-    # m.showStadistics(distOr2, distSuv2, distDP2, distML2, "Original 2", "Blur 2", "Desv Tipica 2", "Union 2")
-
-execute('AS-OCT\im12.jpeg')
+execute('AS-OCT\im1.jpeg')
 plt.show()

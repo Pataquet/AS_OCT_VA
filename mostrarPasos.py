@@ -47,13 +47,15 @@ def showImage4(img1, img2,  img3, img4, title1 = None, title2 = None, title3 = N
     plt.subplot(224), plt.imshow(img4, cmap='gray')
     plt.title(title4), plt.xticks([]), plt.yticks([])
 
-def showStadistics(st1, st2,  st3, st4, title1 = None, title2 = None, title3 = None, title4 = None):
+def showStadistics(st1, st2,  st3, st4, title1 = None, title2 = None, title3 = None, title4 = None, title5 = None):
 
     plt.figure()
     plt.plot(st1)
     plt.plot(st2)
     plt.plot(st3)
     plt.plot(st4)
+    plt.title(title1)
+
 
     plt.figure()
     plt.subplot(221), plt.plot(st1)
