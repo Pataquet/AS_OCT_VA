@@ -54,7 +54,7 @@ def showStadistics(st1, st2,  st3, st4, title1 = None, title2 = None, title3 = N
     plt.plot(st2)
     plt.plot(st3)
     plt.plot(st4)
-    plt.title(title1)
+    plt.title(title5)
 
 
     plt.figure()

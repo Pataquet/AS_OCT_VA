@@ -236,10 +236,9 @@ def calculateDist(dist):
         dist2.append(positions.Positions(dist[i].colum, dist[i].inicio, dist[i].fin))
         dist2[i].distanciaSuav = dist[i].distanciaSuav
 
-    # calcularErro2(dist2)
+    calcularErro2(dist2)
     dt , ml = desviacionTipica(dist)
     return listDist, distancias, dt, ml
-
 
 def calcularError(dist):
     size = len(dist)
@@ -466,5 +465,5 @@ def execute(imagen):
     m.showStadistics(distOr1, distSuv1, distDP1, distML1, "Original 1", "Blur 1", "Desv Tipica 1", "Union 1", "DESVIACION TIPICA")
     m.showStadistics(distOr2, distSuv2, distDP2, distML2, "Original 2", "Blur 2", "Desv Tipica 2", "Union 2", "DESVIACION TIPICA")
 
-execute('AS-OCT\im1.jpeg')
+execute('AS-OCT\im12.jpeg')
 plt.show()
